@@ -4,7 +4,7 @@
 #include <atomic>
 #include <unistd.h>
 #include <termios.h>
-#include <poll.h>
+#include <string>
 #include <cstring>
 
 const int WIDTH = 40;
@@ -15,8 +15,6 @@ int ballDirX, ballDirY;
 int paddle1Y, paddle2Y;
 std::atomic<bool> running(true);
 int numPlayers = 1;
-
-bool wPressed = false, sPressed = false, iPressed = false, kPressed = false;
 
 class Player {
 public:
@@ -60,55 +58,75 @@ void draw() {
     std::cout << "Player 1: " << player1.score << "  Player 2: " << player2.score << '\n';
 }
 
-void setNonBlockingInput(bool enable) {
-    struct termios tty;
-    tcgetattr(STDIN_FILENO, &tty);
-    if (enable) {
-        tty.c_lflag &= ~(ICANON | ECHO);
-        tty.c_cc[VMIN] = 0;
-        tty.c_cc[VTIME] = 0;
-    } else {
-        tty.c_lflag |= (ICANON | ECHO);
-    }
-    tcsetattr(STDIN_FILENO, TCSANOW, &tty);
+char getChar() {
+    char buf = 0;
+    struct termios old = {0};
+    if (tcgetattr(0, &old) < 0)
+        perror("tcsetattr()");
+    old.c_lflag &= ~ICANON;
+    old.c_lflag &= ~ECHO;
+    old.c_cc[VMIN] = 1;
+    old.c_cc[VTIME] = 0;
+    if (tcsetattr(0, TCSANOW, &old) < 0)
+        perror("tcsetattr ICANON");
+    if (read(0, &buf, 1) < 0)
+        perror("read()");
+    old.c_lflag |= ICANON;
+    old.c_lflag |= ECHO;
+    if (tcsetattr(0, TCSADRAIN, &old) < 0)
+        perror ("tcsetattr ~ICANON");
+    return buf;
 }
 
 void input() {
-    setNonBlockingInput(true);
     while (running) {
-        struct pollfd fds[1];
-        fds[0].fd = STDIN_FILENO;
-        fds[0].events = POLLIN;
-        int ret = poll(fds, 1, 0);
-        if (ret > 0) {
-            char c;
-            if (read(STDIN_FILENO, &c, 1) > 0) {
-                if (c == 'w') wPressed = true;
-                if (c == 's') sPressed = true;
-                if (c == 'i') iPressed = true;
-                if (c == 'k') kPressed = true;
-                if (c == 'q') running = false;
-            }
+        char c = getChar();
+        switch (c) {
+            case 'w': if (paddle1Y > 1) paddle1Y--; break;
+            case 's': if (paddle1Y < HEIGHT - 5) paddle1Y++; break;
+            case 'i': if (numPlayers == 2 && paddle2Y > 1) paddle2Y--; break;
+            case 'k': if (numPlayers == 2 && paddle2Y < HEIGHT - 5) paddle2Y++; break;
+            case 'q': running = false; break; // Exit the game
         }
-        if (!ret || (ret && fds[0].revents & POLLHUP)) {
-            if (wPressed && paddle1Y > 1) paddle1Y--;
-            if (sPressed && paddle1Y < HEIGHT - 5) paddle1Y++;
-            if (iPressed && paddle2Y > 1) paddle2Y--;
-            if (kPressed && paddle2Y < HEIGHT - 5) paddle2Y++;
-            wPressed = sPressed = iPressed = kPressed = false;
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
-    setNonBlockingInput(false);
 }
 
-void ai() {
+void ai(int level) {
+    int easyMS = 30;
+    int hardMS = 20;
     while (running) {
         if (ballDirX == 1 && ballX > WIDTH / 2) {
-            if (ballY > paddle2Y + 2 && paddle2Y < HEIGHT - 5) {
-                paddle2Y++;
-            } else if (ballY < paddle2Y + 2 && paddle2Y > 1) {
-                paddle2Y--;
+            switch (level) {
+                case 1:
+                    // Easy
+                    if (ballY > paddle2Y + 2 && paddle2Y < HEIGHT - 5) {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(easyMS));
+                        paddle2Y++;
+                    } else if (ballY < paddle2Y + 2 && paddle2Y > 1) {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(easyMS));
+                        paddle2Y--;
+                    }
+                    break;
+                case 2:
+                    // Hard
+                    if (ballY > paddle2Y + 2 && paddle2Y < HEIGHT - 5) {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(hardMS));
+                        paddle2Y++;
+                    } else if (ballY < paddle2Y + 2 && paddle2Y > 1) {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(hardMS));
+                        paddle2Y--;
+                    }
+                    break;
+                case 3:
+                    // Impossible
+                    if (ballY > paddle2Y + 2 && paddle2Y < HEIGHT - 5) {
+                        paddle2Y++;
+                    } else if (ballY < paddle2Y + 2 && paddle2Y > 1) {
+                        paddle2Y--;
+                    }
+                    break;
+                default:
+                    break;
             }
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
@@ -144,23 +162,49 @@ void logic() {
 }
 
 int main(int argc, char* argv[]) {
+    int numPlayers = 1;
+    int aiLevel = 2;
+
+    // Command line arguments
     if (argc > 1) {
-        if ((strcmp(argv[1], "--players") == 0 || strcmp(argv[1], "-p") == 0) && argc > 2) {
-            numPlayers = std::stoi(argv[2]);
-            if (numPlayers < 1 || numPlayers > 2) {
-                std::cerr << "Invalid number of players. Using default (1 player).\n";
-                numPlayers = 1;
+        for (int i = 1; i < argc; ++i) {
+            if (strcmp(argv[i], "--players") == 0 || strcmp(argv[i], "-p") == 0) {
+                if (i + 1 < argc) {
+                    numPlayers = std::stoi(argv[i + 1]);
+                    if (numPlayers < 1 || numPlayers > 2) {
+                        std::cerr << "Invalid number of players. Using default (1 player).\n";
+                        numPlayers = 1;
+                    }
+                    ++i; // Next argument
+                } else {
+                    std::cerr << "Missing argument after --players/-p.\n";
+                    return 1;
+                }
+            } else if (strcmp(argv[i], "--level") == 0 || strcmp(argv[i], "-l") == 0) {
+                if (i + 1 < argc) {
+                    aiLevel = std::stoi(argv[i + 1]);
+                    if (aiLevel < 1 || aiLevel > 3) {
+                        std::cerr << "Invalid AI level. Using default (2 - hard).\n";
+                        aiLevel = 2;
+                    }
+                    ++i; // Next argument
+                } else {
+                    std::cerr << "Missing argument after --level/-l.\n";
+                    return 1;
+                }
             }
         }
     }
 
+    
     setup();
     std::thread inputThread(input);
     std::thread aiThread;
 
     if (numPlayers == 1) {
-        aiThread = std::thread(ai);
+        aiThread = std::thread(ai, aiLevel);
     }
+
 
     while (running) {
         draw();
