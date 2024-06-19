@@ -6,6 +6,7 @@
 #include <termios.h>
 #include <string>
 #include <cstring>
+#include <random>
 
 const int WIDTH = 40;
 const int HEIGHT = 20;
@@ -15,6 +16,9 @@ int ballDirX, ballDirY;
 int paddle1Y, paddle2Y;
 std::atomic<bool> running(true);
 int numPlayers = 1;
+
+std::random_device rd;
+std::mt19937 gen(rd());
 
 class Player {
 public:
@@ -27,14 +31,17 @@ Player player2;
 void setup() {
     ballX = WIDTH / 2;
     ballY = HEIGHT / 2;
-    ballDirX = -1;
-    ballDirY = -1;
+
+    std::uniform_int_distribution<> dirDist(0, 1);
+    ballDirX = dirDist(gen) == 0 ? -1 : 1;
+    ballDirY = dirDist(gen) == 0 ? -1 : 1;
+
     paddle1Y = HEIGHT / 2 - 2;
     paddle2Y = HEIGHT / 2 - 2;
 }
 
 void draw() {
-    std::cout << "\033[2J\033[H"; // Clear console and move the cursor home 
+    std::cout << "\033[2J\033[H"; // Clear console and move the cursor home
 
     for (int y = 0; y < HEIGHT; ++y) {
         for (int x = 0; x < WIDTH; ++x) {
@@ -92,29 +99,36 @@ void input() {
 }
 
 void ai(int level) {
-    int easyMS = 30;
-    int hardMS = 20;
+    int easyMS = 20;
+    int hardMS = 15;
+
+    std::uniform_real_distribution<> randomMoveDist(0.0, 1.0);
+
     while (running) {
         if (ballDirX == 1 && ballX > WIDTH / 2) {
             switch (level) {
                 case 1:
                     // Easy
-                    if (ballY > paddle2Y + 2 && paddle2Y < HEIGHT - 5) {
-                        std::this_thread::sleep_for(std::chrono::milliseconds(easyMS));
-                        paddle2Y++;
-                    } else if (ballY < paddle2Y + 2 && paddle2Y > 1) {
-                        std::this_thread::sleep_for(std::chrono::milliseconds(easyMS));
-                        paddle2Y--;
+                    if (randomMoveDist(gen) > 0.15) { // 85% Chance
+                        if (ballY > paddle2Y + 2 && paddle2Y < HEIGHT - 5) {
+                            std::this_thread::sleep_for(std::chrono::milliseconds(easyMS));
+                            paddle2Y++;
+                        } else if (ballY < paddle2Y + 2 && paddle2Y > 1) {
+                            std::this_thread::sleep_for(std::chrono::milliseconds(easyMS));
+                            paddle2Y--;
+                        }
                     }
                     break;
                 case 2:
                     // Hard
-                    if (ballY > paddle2Y + 2 && paddle2Y < HEIGHT - 5) {
-                        std::this_thread::sleep_for(std::chrono::milliseconds(hardMS));
-                        paddle2Y++;
-                    } else if (ballY < paddle2Y + 2 && paddle2Y > 1) {
-                        std::this_thread::sleep_for(std::chrono::milliseconds(hardMS));
-                        paddle2Y--;
+                    if (randomMoveDist(gen) > 0.05) { // 95% Chance
+                        if (ballY > paddle2Y + 2 && paddle2Y < HEIGHT - 5) {
+                            std::this_thread::sleep_for(std::chrono::milliseconds(hardMS));
+                            paddle2Y++;
+                        } else if (ballY < paddle2Y + 2 && paddle2Y > 1) {
+                            std::this_thread::sleep_for(std::chrono::milliseconds(hardMS));
+                            paddle2Y--;
+                        }
                     }
                     break;
                 case 3:
@@ -132,7 +146,6 @@ void ai(int level) {
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 }
-
 void logic() {
     ballX += ballDirX;
     ballY += ballDirY;
