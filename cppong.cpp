@@ -34,7 +34,7 @@ void setup() {
 }
 
 void draw() {
-    std::cout << "\033[2J\033[H"; // Clear the console and move the cursor to home position
+    std::cout << "\033[2J\033[H"; // Clear console and move the cursor home 
 
     for (int y = 0; y < HEIGHT; ++y) {
         for (int x = 0; x < WIDTH; ++x) {
@@ -49,7 +49,7 @@ void draw() {
             } else if (x == WIDTH - 3 && y >= paddle2Y && y < paddle2Y + 4) {
                 std::cout << '#'; // Paddle 2
             } else {
-                std::cout << ' '; // Empty space
+                std::cout << ' '; // Empty space, like my soul
             }
         }
         std::cout << '\n';
@@ -162,7 +162,6 @@ void logic() {
 }
 
 int main(int argc, char* argv[]) {
-    int numPlayers = 1;
     int aiLevel = 2;
 
     // Command line arguments
@@ -196,7 +195,6 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    
     setup();
     std::thread inputThread(input);
     std::thread aiThread;
@@ -204,7 +202,6 @@ int main(int argc, char* argv[]) {
     if (numPlayers == 1) {
         aiThread = std::thread(ai, aiLevel);
     }
-
 
     while (running) {
         draw();
