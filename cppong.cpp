@@ -17,6 +17,7 @@ int paddle1Y, paddle2Y;
 std::atomic<bool> running(true);
 int numPlayers = 1;
 int ballSpeed;
+int defaultBallSpeed;
 int collisionCount;
 
 std::random_device rd;
@@ -41,7 +42,7 @@ void setup() {
     paddle1Y = HEIGHT / 2 - 2;
     paddle2Y = HEIGHT / 2 - 2;
 
-    ballSpeed = 80;
+    ballSpeed = defaultBallSpeed;
     collisionCount = 0;
 }
 
@@ -191,6 +192,7 @@ void logic() {
 
 int main(int argc, char* argv[]) {
     int aiLevel = 2;
+    defaultBallSpeed = 80;
 
     // Command line arguments
     if (argc > 1) {
@@ -218,6 +220,14 @@ int main(int argc, char* argv[]) {
                 } else {
                     std::cerr << "Missing argument after --level/-l.\n";
                     return 1;
+                }
+            } else if (strcmp(argv[i], "--speed") == 0 || strcmp(argv[i], "-s") == 0) {
+                if (i + 1 < argc) {
+                    defaultBallSpeed = std::stoi(argv[i + 1]);
+                    i++;
+                } else {
+                    std::cerr << "Missing argument after --speed/-s.\n";
+                    defaultBallSpeed = 75;
                 }
             }
         }
