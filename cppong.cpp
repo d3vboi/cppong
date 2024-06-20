@@ -16,6 +16,8 @@ int ballDirX, ballDirY;
 int paddle1Y, paddle2Y;
 std::atomic<bool> running(true);
 int numPlayers = 1;
+int ballSpeed;
+int collisionCount;
 
 std::random_device rd;
 std::mt19937 gen(rd());
@@ -38,6 +40,9 @@ void setup() {
 
     paddle1Y = HEIGHT / 2 - 2;
     paddle2Y = HEIGHT / 2 - 2;
+
+    ballSpeed = 80;
+    collisionCount = 0;
 }
 
 void draw() {
@@ -63,6 +68,7 @@ void draw() {
     }
 
     std::cout << "Player 1: " << player1.score << "  Player 2: " << player2.score << '\n';
+    std::cout << "Ballspeed: " << ballSpeed << '\n';
 }
 
 char getChar() {
@@ -146,6 +152,14 @@ void ai(int level) {
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 }
+void handleCollision(){
+    collisionCount++;
+        if (collisionCount >= 5) {
+            ballSpeed -= 5;
+            collisionCount = 0;
+        }
+        ballDirX = -ballDirX;
+}
 void logic() {
     ballX += ballDirX;
     ballY += ballDirY;
@@ -157,11 +171,12 @@ void logic() {
 
     // Ball collision with paddles
     if (ballX == 3 && ballY >= paddle1Y && ballY < paddle1Y + 4) {
-        ballDirX = -ballDirX;
+       handleCollision(); 
+
     }
 
     if (ballX == WIDTH - 4 && ballY >= paddle2Y && ballY < paddle2Y + 4) {
-        ballDirX = -ballDirX;
+       handleCollision();    
     }
 
     // Ball goes out of bounds (scores)
@@ -219,7 +234,7 @@ int main(int argc, char* argv[]) {
     while (running) {
         draw();
         logic();
-        std::this_thread::sleep_for(std::chrono::milliseconds(50)); // Delay for game speed
+        std::this_thread::sleep_for(std::chrono::milliseconds(ballSpeed)); // Delay for game speed
     }
 
     inputThread.join();
