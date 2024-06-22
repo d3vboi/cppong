@@ -2,6 +2,9 @@
 # *CPPong*
 
 **CPPong** is a simple console-based implementation of the classic game Pong using C++. Players control paddles to hit a ball back and forth, aiming to score points against their opponent.
+
+![Pong image](./media/pong.png)
+
 ## Features
 
 * Single Player or Two Players: Play against an AI opponent or challenge a friend in a two-player mode.
