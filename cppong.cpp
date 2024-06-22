@@ -24,9 +24,22 @@ std::random_device rd;
 std::mt19937 gen(rd());
 
 class Player {
-public:
-    int score = 0;
+    public:
+        int score = 0;
 };
+
+class Color {
+    public:
+        const char* reset = "\033[0m";
+        const char* ball = "\x1B[35m";
+        const char* ai = "\x1B[31m";
+        const char* player1 = "\x1B[34m";
+        const char* player2 = "\x1B[32m";
+        void print(const char* color, const char* text) {
+            std::cout << color << text << reset;
+        }
+};
+Color color;
 
 Player player1;
 Player player2;
@@ -56,11 +69,11 @@ void draw() {
             } else if (y == 0 || y == HEIGHT - 1) {
                 std::cout << '-'; // Top and bottom walls
             } else if (x == ballX && y == ballY) {
-                std::cout << 'O'; // Ball
+                color.print(color.ball, "O"); // Ball
             } else if (x == 2 && y >= paddle1Y && y < paddle1Y + 4) {
-                std::cout << '#'; // Paddle 1
+                color.print(color.player1, "#"); // Paddle 1
             } else if (x == WIDTH - 3 && y >= paddle2Y && y < paddle2Y + 4) {
-                std::cout << '#'; // Paddle 2
+                color.print(numPlayers == 2 ? color.player2 : color.ai, "#"); // Paddle 2
             } else {
                 std::cout << ' '; // Empty space, like my soul
             }
@@ -68,10 +81,13 @@ void draw() {
         std::cout << '\n';
     }
 
-    std::cout << "Player 1: " << player1.score << "  Player 2: " << player2.score << '\n';
-    std::cout << "Ballspeed: " << ballSpeed << '\n';
+   color.print(color.player1, "Player 1: "); std::cout << player1.score << '\t';
+    if (numPlayers == 2) {
+        color.print(color.player2, "Player 2: ");
+    } else {
+        color.print(color.ai, "AI: ");
+    } std::cout << player2.score << '\n';
 }
-
 char getChar() {
     char buf = 0;
     struct termios old = {0};
@@ -153,7 +169,7 @@ void ai(int level) {
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 }
-void handleCollision(){
+void handlePaddleCollision(){
     collisionCount++;
         if (collisionCount >= 5) {
             ballSpeed -= 5;
@@ -168,16 +184,20 @@ void logic() {
     // Ball collision with top and bottom walls
     if (ballY <= 0 || ballY >= HEIGHT - 1) {
         ballDirY = -ballDirY;
+        if (ballX == 3 && ballY >= paddle1Y) {
+            ballDirX = -ballDirX;
+        } else if (ballX == WIDTH - 4 && ballY >= paddle2Y && ballY < paddle2Y + 4) {
+            ballDirX = -ballDirX;
+        }
     }
 
     // Ball collision with paddles
     if (ballX == 3 && ballY >= paddle1Y && ballY < paddle1Y + 4) {
-       handleCollision(); 
-
+       handlePaddleCollision(); 
     }
 
     if (ballX == WIDTH - 4 && ballY >= paddle2Y && ballY < paddle2Y + 4) {
-       handleCollision();    
+       handlePaddleCollision();    
     }
 
     // Ball goes out of bounds (scores)
@@ -188,6 +208,15 @@ void logic() {
         player1.score++;
         setup();
     }
+}
+
+void printArgHelp() {
+    std::cout << "Usage: cppong [options]\n"
+              << "Options:\n"
+              << "  -p, --players <num>    Number of players (1 or 2)\n"
+              << "  -l, --level <level>    AI level (1-3)\n"
+              << "  -s, --speed <speed>    Ball speed (default is 80)\n"
+              << "  -h, --help             Display this help message\n";
 }
 
 int main(int argc, char* argv[]) {
@@ -229,7 +258,11 @@ int main(int argc, char* argv[]) {
                     std::cerr << "Missing argument after --speed/-s.\n";
                     defaultBallSpeed = 75;
                 }
+            } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
+                printArgHelp();
+                return 0;
             }
+ 
         }
     }
 
